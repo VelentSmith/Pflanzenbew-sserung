@@ -216,7 +216,7 @@ def render_overview():
                     for p in m["plants"]
                 ])
                 st.dataframe(df, use_container_width=True, hide_index=True)
-            c1, c2 = st.columns([1,1])
+            c2 = st.columns([1])
             with c1:
                 if st.button("Details öffnen", key=f"open_{m['id']}", use_container_width=True):
                     st.session_state.selected_module_id = m["id"]
@@ -365,3 +365,4 @@ if view == "Übersicht":
     render_overview()
 else:
     render_module_details()
+
