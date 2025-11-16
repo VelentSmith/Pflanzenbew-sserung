@@ -217,10 +217,6 @@ def render_overview():
                 ])
                 st.dataframe(df, use_container_width=True, hide_index=True)
             c2 = st.columns([1])
-            with c1:
-                if st.button("Details öffnen", key=f"open_{m['id']}", use_container_width=True):
-                    st.session_state.selected_module_id = m["id"]
-                    st.rerun()
             with c2:
                 if st.button("Modul entfernen", key=f"rm_{m['id']}", use_container_width=True):
                     remove_module(db, m["id"])
@@ -365,4 +361,5 @@ if view == "Übersicht":
     render_overview()
 else:
     render_module_details()
+
 
