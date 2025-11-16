@@ -3,11 +3,10 @@
 # ANFORDERUNGEN (angepasst 2025-11-16):
 # - Module (ESP32) zentral via Raspberry visualisieren/parametrieren
 # - Pro Modul: 1 Pumpe, 1 Durchflussmesser, max. 5 Pflanzen/Ventile/Sensoren
+# - Inkl. Füllstandsanzeige (Gauge) und Kalibrier-Buttons (Platzhalter)
 # - Zwei Modi:
 #   (1) Zeitbasiert: Intervall konfigurierbar (nur in 2h-Schritten), Menge in ml/L.
 #   (2) Zeit + Feuchte: wie (1), zusätzlich giessen nur, wenn Feuchte-Threshold (%) unterschritten.
-# - Hauptfenster: Übersicht aller Module, Module hinzufügen. Klick auf Modul öffnet Details.
-# - In Details: Pflanzen (max 5) hinzufügen/bearbeiten, Sensorwerte, manuelle Steuerung.
 
 import json
 import os
@@ -17,6 +16,7 @@ from typing import Dict, Any, List
 import numpy as np
 import pandas as pd
 import streamlit as st
+from streamlit_echarts import st_echarts # NEU: Import für Gauge Chart
 
 # ---------- Persistenz ----------
 
@@ -101,9 +101,6 @@ def next_due_time(last_iso: str, interval_days: float) -> datetime:
     intervals_since = diff_seconds / interval_seconds
     
     # Nächster voller Intervall-Slot (Decke)
-    # z.B. 0.0 (jetzt) -> 0.0 -> Fällig jetzt
-    # z.B. 0.1 (gerade passiert) -> 1.0 -> Fällig im nächsten Intervall
-    # z.B. 3.4 (3 verpasst) -> 4.0 -> Fällig im 4. Intervall
     next_interval_num = np.ceil(intervals_since)
 
     # Wenn wir exakt auf 0.0 sind (Startzeit = Now), ist 0 der nächste Slot.
@@ -123,6 +120,7 @@ def add_module(db: Dict[str, Any], name: str) -> None:
         "esp32_addr": "",      # optional
         "pump_relay": 0,       # Relais-Index
         "flowmeter_id": 0,     # ID
+        "tank_level_percent": 75.0, # NEU: Füllstand
         "plants": [],          # bis zu 5 Pflanzen (Update)
         "logs": [],            # simple Ereignislogs
         "created_at": now_iso(),
@@ -147,7 +145,7 @@ def add_log(module: Dict[str, Any], text: str) -> None:
     module["updated_at"] = now_iso()
 
 def add_plant(module: Dict[str, Any], name: str) -> None:
-    # (Update) Limit auf 5 erhöht
+    # (Update) Limit auf 5
     if len(module["plants"]) >= 5:
         st.error("Maximum von 5 Pflanzen für dieses Modul erreicht.")
         return
@@ -253,6 +251,44 @@ def render_overview():
     for m in db["modules"]:
         with cols[idx % 3]:
             st.subheader(f"Modul #{m['id']} — {m['name']}")
+            
+            # --- NEU: Gauge Chart für Füllstand ---
+            tank_level = m.get("tank_level_percent", 0.0)
+
+            echarts_options = {
+                "series": [
+                    {
+                        "type": "gauge",
+                        "startAngle": 180,
+                        "endAngle": 0,
+                        "min": 0,
+                        "max": 100,
+                        "splitNumber": 10,
+                        "axisLine": {
+                            "lineStyle": {
+                                "width": 6,
+                                "color": [
+                                    [0.3, "#fd666d"], # Rot (0-30%)
+                                    [0.7, "#ff9900"], # Orange (30-70%)
+                                    [1, "#67e0e3"]    # Grün (70-100%)
+                                ]
+                            }
+                        },
+                        "pointer": {"width": 5},
+                        "axisLabel": {"show": False}, 
+                        "detail": {
+                            "valueAnimation": True,
+                            "formatter": f"{tank_level:.0f}%", 
+                            "color": "auto",
+                            "offsetCenter": [0, '60%']
+                        },
+                        "data": [{"value": tank_level, "name": "Tank"}],
+                    }
+                ]
+            }
+            st_echarts(options=echarts_options, height="150px", key=f"gauge_{m['id']}")
+            # --- ENDE NEU ---
+
             st.caption(f"Erstellt: {parse_iso(m.get('created_at','')).strftime('%Y-%m-%d')}")
             st.caption(f"Aktualisiert: {parse_iso(m.get('updated_at','')).strftime('%Y-%m-%d %H:%M')}")
             
@@ -278,7 +314,6 @@ def render_overview():
                 st.session_state.selected_module_id = None
                 idx-=1
                 st.rerun()
-                idx-=1
         idx += 1
 
 # ---------- Ansicht: Modul-Details ----------
@@ -293,7 +328,7 @@ def render_module_details():
 
     st.title(f"Modul #{module['id']} — {module['name']}")
 
-    with st.expander("Modul-Einstellungen", expanded=False):
+    with st.expander("Modul-Einstellungen", expanded=True): # Standardmäßig geöffnet
         c1, c2, c3 = st.columns(3)
         with c1:
             new_name = st.text_input("Name", value=module["name"], key=f"name_{module['id']}")
@@ -302,22 +337,46 @@ def render_module_details():
         with c3:
             pump_relay = st.number_input("Pumpen-Relais (Index)", min_value=0, max_value=8, value=int(module.get("pump_relay",0)), step=1, key=f"pump_{module['id']}")
         
-        c4, c5, c6 = st.columns([1,1,2])
+        c4, c5 = st.columns(2)
         with c4:
             flow_id = st.number_input("Durchflussmesser-ID", min_value=0, max_value=255, value=int(module.get("flowmeter_id",0)), step=1, key=f"flow_{module['id']}")
+        
         with c5:
-            # Platzhalter
-            pass
+            tank_level_ui = st.slider(
+                "Tank-Füllstand [%] (Sensorwert)", 
+                min_value=0.0, 
+                max_value=100.0, 
+                value=float(module.get("tank_level_percent", 75.0)), 
+                step=1.0, 
+                key=f"tank_{module['id']}"
+            )
+        
+        # --- NEU: Tank-Kalibrierung ---
+        c6, c7, c8 = st.columns([2,1,1])
         with c6:
             if st.button("Speichern (Modul)", key=f"save_mod_{module['id']}", use_container_width=True, type="primary"):
                 module["name"] = new_name
                 module["esp32_addr"] = esp32
                 module["pump_relay"] = int(pump_relay)
                 module["flowmeter_id"] = int(flow_id)
+                module["tank_level_percent"] = float(tank_level_ui) # Wert speichern
                 module["updated_at"] = now_iso()
                 add_log(module, "Modulparameter aktualisiert")
                 save_db(db)
                 st.rerun()
+        with c7:
+            if st.button("Tank 'leer' kalibrieren", key=f"cal_tank_min_{module['id']}", use_container_width=True):
+                # PLATZHALTER: Hier würde die Logik zum Speichern des 'min' Rohwerts hinkommen
+                add_log(module, "Aktion: Tank 'leer' kalibriert (Platzhalter)")
+                save_db(db)
+                st.rerun()
+        with c8:
+            if st.button("Tank 'voll' kalibrieren", key=f"cal_tank_max_{module['id']}", use_container_width=True):
+                # PLATZHALTER: Hier würde die Logik zum Speichern des 'max' Rohwerts hinkommen
+                add_log(module, "Aktion: Tank 'voll' kalibriert (Platzhalter)")
+                save_db(db)
+                st.rerun()
+        # --- ENDE NEU ---
 
     st.markdown("---")
     st.subheader("Pflanzen")
@@ -374,27 +433,19 @@ def render_module_details():
             with cC:
                 # (FIX) Logik korrigiert, um den Wert bei Einheiten-Wechsel anzupassen
                 amt_ml_db = float(p["amount_ml"])
-                
-                # 1. Standard-Einheit basierend auf DB-Wert bestimmen
                 _, amt_unit_default = ml_to_value_unit(amt_ml_db)
-                
-                # 2. Selectbox (löst rerun aus)
                 unit_amt = st.selectbox(
                     "Mengen-Einheit", 
                     ["ml","L"], 
                     index=["ml","L"].index(amt_unit_default), 
                     key=f"amtunit_{module['id']}_{p['id']}"
                 )
-
-                # 3. Wert und Schrittweite basierend auf *gewählter* Einheit berechnen
                 if unit_amt == "L":
                     display_val = amt_ml_db / 1000.0
                     step_val = 0.1
                 else: # ml
                     display_val = amt_ml_db
                     step_val = 10.0
-                    
-                # 4. NumberInput mit angepasstem Wert
                 amt_in = st.number_input(
                     "Menge", 
                     min_value=0.0, 
@@ -402,7 +453,6 @@ def render_module_details():
                     step=step_val, 
                     key=f"amt_{module['id']}_{p['id']}"
                 )
-                # Interne Umrechnung in ml
                 amount_ml = amount_to_ml(amt_in, unit_amt)
 
 
@@ -419,11 +469,27 @@ def render_module_details():
             due = next_due_time(p["last_watered"], interval_days)
             st.caption(f"Nächste Zeit-Fälligkeit: {due.strftime('%Y-%m-%d %H:%M')} UTC")
 
-            # Bedingung, ob bei Modus 2 gegossen würde (zum Zeitpunkt der Fälligkeit):
+            # Bedingung, ob bei Modus 2 gegossen würde
             would_water_now = True
             if mode == "Zeit+Feuchte":
                 would_water_now = moisture < thr
+                
+            # --- NEU: Feuchte-Kalibrierung ---
+            cK1, cK2, cK_spacer = st.columns([1,1,2])
+            with cK1:
+                if st.button("Trocken kalibrieren", key=f"cal_soil_min_{module['id']}_{p['id']}", use_container_width=True):
+                    add_log(module, f"Aktion: Pflanze {p['name']} 'trocken' kalibriert (Platzhalter)")
+                    save_db(db)
+                    st.rerun()
+            with cK2:
+                if st.button("Feucht kalibrieren", key=f"cal_soil_max_{module['id']}_{p['id']}", use_container_width=True):
+                    add_log(module, f"Aktion: Pflanze {p['name']} 'feucht' kalibriert (Platzhalter)")
+                    save_db(db)
+                    st.rerun()
+            # --- ENDE NEU ---
 
+            st.markdown("---") # Visueller Trenner vor den Aktions-Buttons
+            
             cG, cH, cI, cJ = st.columns([1,1,1,1])
             with cG:
                 if st.button("Speichern (Pflanze)", key=f"savep_{module['id']}_{p['id']}", use_container_width=True):
@@ -437,9 +503,6 @@ def render_module_details():
                     p["moisture_threshold"] = float(thr)
                     p["current_moisture"] = float(moisture)
                     
-                    # Wenn Intervall oder Modus geändert wird, wird 'last_watered' *nicht* geändert,
-                    # die 'next_due_time' Logik berechnet die Fälligkeit trotzdem korrekt neu.
-
                     module["updated_at"] = now_iso()
                     add_log(module, f"Pflanze aktualisiert: {p['name']}")
                     save_db(db)
