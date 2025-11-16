@@ -278,6 +278,7 @@ def render_overview():
                 st.session_state.selected_module_id = None
                 idx-=1
                 st.rerun()
+                idx-=1
         idx += 1
 
 # ---------- Ansicht: Modul-Details ----------
