@@ -84,7 +84,7 @@ class Pot:
         # ÄNDERUNG 1: Variablen initialisiert
         self.moist_max = 100
         self.moist_min = 0
-"""
+    """
     def CheckMoisture(self):
         cur_cmd_timestamp = datetime.now().isoformat()
         found_entry = False
@@ -118,7 +118,7 @@ class Pot:
 
         return wat_clearance     
  
-"""
+    """
     def WaterThePot(self): 
         # Vereinfachte Logik, damit MQTT Befehl sicher rausgeht
         trigger = False
@@ -346,6 +346,7 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Fehler in main loop: {e}")
+
 
 
 
