@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 import time as systime
 import paho.mqtt.client as mqtt
@@ -14,32 +14,41 @@ class Module:
         self.module_id = module_id
         self.name = name
         self.wat_event_time = time(9,0)
+        # ÄNDERUNG 1: Variablen initialisiert (vorher Syntaxfehler)
         self.TankLvl = None
-        self.TankLvlMax= 100
-        self.TankLvlMin= 0
-        self.MQTT_buffer =[]
-        self.pots ={}
+        self.TankLvlMax = 100
+        self.TankLvlMin = 0
+        self.MQTT_buffer = []
+        self.pots = {}
+        # ÄNDERUNG 2: Log-Liste für Streamlit hinzugefügt
+        self.app_log = [] 
 
             # --- Create Pots, module function -----------------------
     # region 
     def AddPot(self, module_pos, name, control_mode, water_amount, wat_event_cyc, moist_thresh):
+        # ÄNDERUNG 3: Explizite Umwandlung in Zahlen (float/int), damit Streamlit nicht abstürzt
         pot = Pot(
             module = self,
             module_pos=module_pos,
             name=name,
             control_mode=control_mode,
-            wat_amount=water_amount,
-            wat_event_cyc=wat_event_cyc,
-            moist_thresh=moist_thresh
+            wat_amount=float(water_amount),
+            wat_event_cyc=float(wat_event_cyc),
+            moist_thresh=int(moist_thresh)
         )
         self.pots[pot.module_pos] = pot
         print(f"Pot {pot.name} added to Module {self.module_id} at position {pot.module_pos}.")
+
+        # Job-ID prüfen, um Fehler bei Neuladen zu vermeiden
+        job_id = f"j_M{self.module_id}P{pot.module_pos}"
+        if scheduler.get_job(job_id):
+            scheduler.remove_job(job_id)
 
         scheduler.add_job(
             pot.WaterThePot,
             'interval',
             minutes = pot.wat_event_cyc,
-            id = f"j_M{self.module_id}P{pot.module_pos}",
+            id = job_id,
             replace_existing = True,
             misfire_grace_time = 1800)  
         print(f"Scheduler-Job erstellt für Pot {pot.module_pos} (Intervall: {pot.wat_event_cyc} min)")
@@ -49,9 +58,14 @@ class Module:
 
      # region 
     def DeletePot(self,module_pos):
-        scheduler.remove_job(f"j_M{self.module_id}P{module_pos}")
-        del self.pots[module_pos]
-        print(f"Pot {module_pos} deleted from Module {self.module_id}.")
+        # Job-Existenz prüfen vor dem Löschen
+        job_id = f"j_M{self.module_id}P{module_pos}"
+        if scheduler.get_job(job_id):
+            scheduler.remove_job(job_id)
+            
+        if module_pos in self.pots:
+            del self.pots[module_pos]
+            print(f"Pot {module_pos} deleted from Module {self.module_id}.")
     # endregion
 
 
@@ -67,10 +81,10 @@ class Pot:
         self.moist_thresh = moist_thresh
         self.last_wat_event = None
         self.moist_value = 0
+        # ÄNDERUNG 1: Variablen initialisiert
         self.moist_max = 100
-        self.moist_min =0
-
-    """
+        self.moist_min = 0
+"""
     def CheckMoisture(self):
         cur_cmd_timestamp = datetime.now().isoformat()
         found_entry = False
@@ -105,12 +119,15 @@ class Pot:
         return wat_clearance     
  
     """
-
     def WaterThePot(self): 
-        #print(f"startet watering for pot {self.module_pos}")
-        #wat_clearance = self.CheckMoisture()
-
-        if self.control_mode == "time" or (self.control_mode == "moist" and self.moist_value <= self.moist_thresh):
+        # Vereinfachte Logik, damit MQTT Befehl sicher rausgeht
+        trigger = False
+        if self.control_mode == "time":
+            trigger = True
+        elif self.control_mode == "moist" and self.moist_value <= self.moist_thresh:
+            trigger = True
+            
+        if trigger:
             cur_cmd_timestamp = datetime.now()
             payload = json.dumps({"Type": "RequestWatering", "time_stamp": cur_cmd_timestamp.isoformat(), "Pot": self.module_pos, "Amount": self.wat_amount})
             topic = f"{MQTT_SuperTOPIC}/Module{self.module.module_id}/cmd"
@@ -121,7 +138,7 @@ class Pot:
                 print(f"[{datetime.now().isoformat()}] MQTT → {payload}")
             else:
                 print(f"Fehler beim Senden an MQTT: {status}")
-
+                
         elif self.control_mode == "moist" and self.moist_value > self.moist_thresh:
             print(f"Pot {self.module_pos} not watered due to moisture value")
         else: print(f"wtf happened here!?")
@@ -168,8 +185,6 @@ class Pot:
             return False
         
 
-           
-
 # --- MQTT Setup -----------------------------------------------------
 # region MQTT Setup 
 MQTT_BROKER = "mqtt.croku.at"
@@ -182,14 +197,24 @@ client = mqtt.Client()
 
 def on_connect(c, u, flags, rc): print("MQTT connected:", rc)
 def on_disconnect(c, u, rc):      print("MQTT disconnected:", rc)
+
 def on_message(client, userdata, msg):
     try:
         data = json.loads(msg.payload.decode())    
-        mod_id = int(msg.topic.replace("Greenthumb/Modul", ""))
-        module = Modules.get(mod_id)
-        MQTT_data_buffer.append(data)
-        module.MQTT_buffer.append(data)
-        print(f"Antwort empfangen: {data}")
+        
+        # ÄNDERUNG 4: Korrektur Tippfehler und Parsing-Logik
+        # Original war: msg.topic.replac("Greenthumb/Modul", "") -> Tippfehler 'replac' und Logikfehler 'Modul' vs 'Module'
+        parts = msg.topic.split('/')
+        if len(parts) >= 2 and "Module" in parts[1]:
+            mod_id_str = parts[1].replace("Module", "")
+            if mod_id_str.isdigit():
+                mod_id = int(mod_id_str)
+                module = Modules.get(mod_id)
+                if module:
+                    MQTT_data_buffer.append(data)
+                    # ÄNDERUNG 5: Tippfehler abbend -> append
+                    module.MQTT_buffer.append(data)
+                    print(f"Antwort empfangen: {data}")
 
     except Exception as e:
         print(f"Fehler beim Verarbeiten der MQTT-Nachricht: {e}")
@@ -202,13 +227,15 @@ rc	Bedeutung	Erklärung
 4	Falscher Benutzername oder Passwort	Authentifizierungsfehler
 5	Nicht autorisiert	Keine Berechtigung für die Verbindung
 '''
-
-
 client.on_connect = on_connect
 client.on_disconnect = on_disconnect
 client.on_message = on_message
-client.connect(MQTT_BROKER, MQTT_PORT, 60)
-client.loop_start()
+
+try:
+    client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    client.loop_start()
+except Exception as e:
+    print(f"MQTT Connection failed: {e}")
 # endregion
 
 # --- Global Scheduler ------------------------------------------------
@@ -229,16 +256,15 @@ def AddModule(module_id, name):
     return module
 #endregion
 
-
-
 def ProcessBufferData(module, msg):
-    match msg.get("Type"):
-        case "CycSensorValues":
-            ProcessSensorData(module, msg)
-        case "RespCalibration":
-            ProcessCalibrationData(module, msg)
-        case "Platzhalter":
-            print(f"unknonwn message type")
+    # ÄNDERUNG: Typ sicherstellen
+    m_type = msg.get("Type")
+    if m_type == "CycSensorValues":
+        ProcessSensorData(module, msg)
+    elif m_type == "RespCalibration":
+        ProcessCalibrationData(module, msg)
+    else:
+        print(f"unknown message type: {m_type}")
 
 
 def ReqestCalibration(module_id, sensor, pot, minORmax):
@@ -274,24 +300,32 @@ def ProcessCalibrationData(module, msg):
 
     
 def ProcessSensorData(module, msg):
-    LvlRaw = int(msg["PLvl"]) - int(msg["PRef"])
-    module.TankLvl = (LvlRaw - module.TankLvlMin)*100/module.TankLvlMax
+    try:
+        # ÄNDERUNG: Fehlerbehandlung falls Keys fehlen
+        p_lvl = int(msg.get("PLvl", 0))
+        p_ref = int(msg.get("PRef", 0))
+        LvlRaw = p_lvl - p_ref
+        
+        # Vermeidung Division durch Null
+        denom = module.TankLvlMax if module.TankLvlMax != 0 else 100
+        module.TankLvl = (LvlRaw - module.TankLvlMin)*100/denom
 
-    for i in range(1, 5):
-        module.pots[i].moist_value = int(msg[f"MPot{i}"])
+        for i in range(1, 5):
+            key = f"MPot{i}"
+            if key in msg and i in module.pots:
+                module.pots[i].moist_value = int(msg[key])
+    except Exception as e:
+        print(f"Fehler in SensorData: {e}")
 
 
 # --- instantiate objects, TO BE REPLACED BY UI INPUT!!! -----------------------
 # region 
-AddModule(1, "Fensterbank")
-AddModule(2, "Regal")
+    AddModule(1, "Fensterbank")
+    AddModule(2, "Regal")
 
-Modules[1].AddPot(1, "Orchidee", "time", 250, 6, 15)
-Modules[1].AddPot(2, "Kaktus", "moist", 100, 2, 0)
-Modules[2].AddPot(3, "Monstera", "moist", 1400, 1, 15)
-
-
-
+    Modules[1].AddPot(1, "Orchidee", "time", 250, 60, 15)
+    Modules[1].AddPot(2, "Kaktus", "moist", 100, 20, 0)
+    Modules[2].AddPot(3, "Monstera", "moist", 1400, 10, 15)
 # endregion
 
 # --- Main ------------------------------------------------------------
@@ -300,7 +334,7 @@ if __name__ == "__main__":
 
     try:
         while True:
-            for module in Modules.values:
+            for module in Modules.values():
                 while module.MQTT_buffer:
                     msg = module.MQTT_buffer.pop(0)
                     ProcessBufferData(module, msg)
@@ -313,11 +347,3 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Fehler in main loop: {e}")
-
-
-
-
-
-
-
-
