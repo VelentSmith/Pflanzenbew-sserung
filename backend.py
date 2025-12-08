@@ -286,9 +286,9 @@ def ProcessSensorData(module, msg):
 AddModule(1, "Fensterbank")
 AddModule(2, "Regal")
 
-Modules[1].AddPot(1, "Orchidee", "time", 0.25, 0.5, 15)
-Modules[1].AddPot(2, "Kaktus", "moist", 0.1, 2, 0)
-Modules[2].AddPot(3, "Monstera", "moist", 1.4, 1, 15)
+Modules[1].AddPot(1, "Orchidee", "time", 250, 6, 15)
+Modules[1].AddPot(2, "Kaktus", "moist", 100, 2, 0)
+Modules[2].AddPot(3, "Monstera", "moist", 1400, 1, 15)
 
 
 
@@ -313,6 +313,7 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Fehler in main loop: {e}")
+
 
 
 
