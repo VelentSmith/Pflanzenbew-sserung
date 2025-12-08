@@ -6,7 +6,7 @@ from datetime import datetime
 
 # Wir importieren dein unveränderbares Backend als Modul
 # Voraussetzung: PythonApplication1.py liegt im selben Ordner!
-import PythonApplication1.py as backend
+import backend
 
 # --- 1. KONFIGURATION & STYLING ---------------------------------------------
 
