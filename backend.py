@@ -23,7 +23,7 @@ class Module:
         # ÄNDERUNG 2: Log-Liste für Streamlit hinzugefügt
         self.app_log = [] 
 
-            # --- Create Pots, module function -----------------------
+    # --- Create Pots, module function -----------------------
     # region 
     def AddPot(self, module_pos, name, control_mode, water_amount, wat_event_cyc, moist_thresh):
         # ÄNDERUNG 3: Explizite Umwandlung in Zahlen (float/int), damit Streamlit nicht abstürzt
@@ -56,7 +56,7 @@ class Module:
         return pot
     # endregion
 
-     # region 
+    # region 
     def DeletePot(self,module_pos):
         # Job-Existenz prüfen vor dem Löschen
         job_id = f"j_M{self.module_id}P{module_pos}"
@@ -118,7 +118,7 @@ class Pot:
 
         return wat_clearance     
  
-    """
+"""
     def WaterThePot(self): 
         # Vereinfachte Logik, damit MQTT Befehl sicher rausgeht
         trigger = False
@@ -346,5 +346,6 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Fehler in main loop: {e}")
+
 
 
