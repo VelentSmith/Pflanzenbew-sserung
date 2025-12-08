@@ -14,9 +14,9 @@ class Module:
         self.module_id = module_id
         self.name = name
         self.wat_event_time = time(9,0)
-        self.TankLvl
-        self.TankLvlMax
-        self.TankLvlMin
+        self.TankLvl = None
+        self.TankLvlMax= 100
+        self.TankLvlMin= 0
         self.MQTT_buffer =[]
         self.pots ={}
 
@@ -67,8 +67,8 @@ class Pot:
         self.moist_thresh = moist_thresh
         self.last_wat_event = None
         self.moist_value = 0
-        self.moist_max
-        self.moist_min
+        self.moist_max = 100
+        self.moist_min =0
 
     """
     def CheckMoisture(self):
@@ -313,6 +313,7 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Fehler in main loop: {e}")
+
 
 
 
