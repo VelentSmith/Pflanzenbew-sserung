@@ -4,7 +4,7 @@ import time
 import os
 from datetime import datetime
 
-# Wir importieren dein unveränderbares Backend als Modul
+# Import Backend (muss im selben Ordner liegen als backend.py)
 import backend
 
 # --- 1. KONFIGURATION & STYLING ---------------------------------------------
@@ -27,6 +27,11 @@ st.markdown("""
     div[data-testid="stToast"] {
         background-color: #e6fffa;
         border: 1px solid #4CAF50;
+    }
+    /* Radio Buttons horizontal kompakter machen */
+    div[row-widget="radio"] > div {
+        flex-direction: row;
+        gap: 20px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -57,40 +62,56 @@ def get_presets():
     if not os.path.exists("Presets"): return []
     return [f.replace("preset_", "").replace(".json", "") for f in os.listdir("Presets") if f.endswith(".json")]
 
-def convert_minutes_to_ui(minutes):
-    """Wandelt Minuten intelligent in Stunden/Tage für die Anzeige um."""
-    if minutes == 0: return 0, "Minuten"
-    if minutes % 1440 == 0: return int(minutes / 1440), "Tage"
-    if minutes % 60 == 0: return int(minutes / 60), "Stunden"
-    return int(minutes), "Minuten"
+# --- UMRECHNUNGSLOGIK ---
 
-def convert_ui_to_minutes(value, unit):
-    """Wandelt die UI-Eingabe zurück in Minuten für das Backend."""
-    if unit == "Tage": return int(value * 1440)
-    if unit == "Stunden": return int(value * 60)
-    return int(value)
+def get_time_display_values(minutes_val, selected_unit):
+    """Rechnet Minuten (Backend) in die UI-Einheit um."""
+    if selected_unit == "Tage":
+        return float(minutes_val / 1440.0) # 60*24
+    else: # Stunden
+        return float(minutes_val / 60.0)
+
+def get_time_backend_minutes(ui_value, selected_unit):
+    """Rechnet UI-Eingabe zurück in Minuten."""
+    if selected_unit == "Tage":
+        return int(ui_value * 1440)
+    else: # Stunden
+        return int(ui_value * 60)
+
+def get_water_display_values(ml_val, selected_unit):
+    """Rechnet ml (Backend) in die UI-Einheit um."""
+    if selected_unit == "Liter":
+        return float(ml_val / 1000.0)
+    else: # ml
+        return float(ml_val)
+
+def get_water_backend_ml(ui_value, selected_unit):
+    """Rechnet UI-Eingabe zurück in ml."""
+    if selected_unit == "Liter":
+        return float(ui_value * 1000.0)
+    else: # ml
+        return float(ui_value)
 
 # --- 3. VISUALISIERUNG ------------------------------------------------------
 
 def draw_water_tank_graphic(current, min_val, max_val):
-    """Zeichnet Tank mit Rot/Blau Logik."""
     if current is None:
-        st.warning("Warte auf Sensordaten...")
+        st.warning("Keine Sensordaten...")
         return
 
     pct = max(0, min(100, current))
     
-    # NEU: Deutliche Farben (Rot bei <= 20%, sonst Blau)
     if pct <= 20:
-        color_top, color_bot = "#ef4444", "#fca5a5" # Rot / Hellrot
-        status_text = "KRITISCH"
+        color_top, color_bot = "#ef4444", "#fca5a5"
+        status_text = "⚠️ NACHFÜLLEN"
         text_color = "#b91c1c"
     else:
-        color_top, color_bot = "#3b82f6", "#93c5fd" # Blau / Hellblau
-        status_text = "OK"
+        color_top, color_bot = "#3b82f6", "#93c5fd"
+        status_text = "✅ Füllstand OK"
         text_color = "#1f2937"
     
     html_code = f"""
+    <div style="text-align:center; font-weight:bold; color:#555; margin-bottom:5px;">Wassertank</div>
     <div style="border: 2px solid #e5e7eb; border-radius: 12px; height: 180px; width: 100%; position: relative; background: #f3f4f6; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
         <div style="
             position: absolute; bottom: 0; left: 0; right: 0;
@@ -146,7 +167,7 @@ def page_overview():
                 st.subheader(f"{mod.name} (ID: {m_id})")
                 c_a, c_b = st.columns(2)
                 level = getattr(mod, 'TankLvl', 0)
-                c_a.metric("Tank", f"{level:.0f}%" if level is not None else "?")
+                c_a.metric("Füllstand", f"{level:.0f}%" if level is not None else "?")
                 c_b.metric("Pflanzen", f"{len(mod.pots)} / 4")
                 if st.button(f"Verwalten >", key=f"btn_mod_{m_id}", use_container_width=True):
                     st.session_state.selected_module = m_id
@@ -171,11 +192,11 @@ def page_detail():
     # --- OBERER BEREICH ---
     col_tank, col_calib, col_log = st.columns([1.5, 1, 2.5])
     with col_tank:
-        st.markdown("#### 💧 Wassertank")
         draw_water_tank_graphic(getattr(mod, 'TankLvl', None), getattr(mod, 'TankLvlMin', '?'), getattr(mod, 'TankLvlMax', '?'))
         
     with col_calib:
         st.markdown("#### Kalibrierung")
+        st.caption("Füllstandssensor:")
         if st.button("Setze MIN (Leer)", key="cal_min", use_container_width=True):
             backend.ReqestCalibration(m_id, "Plvl", 0, "min")
             st.toast("Kalibrierung MIN gesendet", icon="📡")
@@ -204,7 +225,8 @@ def page_detail():
                 p_pos = c_p2.number_input("Position (1-4)", 1, 4, step=1)
                 if st.form_submit_button("Hinzufügen"):
                     if p_pos not in mod.pots:
-                        mod.AddPot(p_pos, p_name, "time", 0.5, 60, 20)
+                        # Initiale Werte: Zeit in Min (60), Wasser in ml (500)
+                        mod.AddPot(p_pos, p_name, "time", 500, 60, 20)
                         log_event(m_id, f"Pflanze {p_name} hinzugefügt", "SETUP")
                         st.rerun()
     
@@ -214,13 +236,22 @@ def page_detail():
         with st.container(border=True):
             cols = st.columns([1, 2, 1])
             
-            # Live Werte
+            # SPALTE 1: Live Werte
             with cols[0]:
                 st.markdown(f"**{pot.name}** (Pos {pos})")
                 moist = getattr(pot, 'moist_value', 0)
-                st.metric("Feuchtigkeit", f"{moist}%", delta=f"Soll: <{pot.moist_thresh}%")
+                status_moist = "Trocken" if moist <= pot.moist_thresh else "Feucht"
+                delta_color = "inverse" if moist <= pot.moist_thresh else "normal"
+                
+                st.metric(
+                    label="Bodenfeuchtigkeit", 
+                    value=f"{moist}%", 
+                    delta=f"Status: {status_moist}",
+                    delta_color=delta_color
+                )
+                st.caption(f"Grenzwert: {pot.moist_thresh}%")
 
-            # Einstellungen
+            # SPALTE 2: Einstellungen
             with cols[1]:
                 with st.expander("⚙️ Einstellungen"):
                     # Presets
@@ -235,15 +266,39 @@ def page_detail():
                     
                     st.divider()
                     
-                    # Intervall Rechner (NEU)
-                    st.markdown("**Bewässerungs-Plan**")
-                    current_val, current_unit = convert_minutes_to_ui(pot.wat_event_cyc)
+                    # --- ZEIT EINSTELLUNG ---
+                    st.markdown("**Intervall (Gieß-Zyklus)**")
+                    # Unit Selector
+                    t_unit_sel = st.radio("Zeiteinheit", ["Stunden", "Tage"], key=f"tu_sel_{pos}", label_visibility="collapsed")
                     
-                    c_time_val, c_time_unit = st.columns(2)
-                    new_time_val = c_time_val.number_input("Alle...", min_value=1, value=current_val, key=f"ntv_{pos}")
-                    new_time_unit = c_time_unit.selectbox("Einheit", ["Minuten", "Stunden", "Tage"], index=["Minuten", "Stunden", "Tage"].index(current_unit), key=f"ntu_{pos}")
+                    # Automatische Umrechnung Backend (min) -> UI (h/d)
+                    current_t_val = get_time_display_values(pot.wat_event_cyc, t_unit_sel)
                     
-                    new_amount = st.number_input("Menge (Liter)", 0.1, 5.0, pot.wat_amount, step=0.1, key=f"am_{pos}")
+                    # Kleinste Einheit ist 1 Stunde
+                    min_t_input = 1.0 if t_unit_sel == "Stunden" else (1.0/24.0) 
+                    
+                    new_time_val = st.number_input(
+                        f"Alle ({t_unit_sel})", 
+                        min_value=min_t_input, 
+                        value=float(current_t_val), 
+                        step=0.5, 
+                        key=f"ntv_{pos}"
+                    )
+
+                    # --- WASSERMENGE EINSTELLUNG ---
+                    st.markdown("**Wassermenge**")
+                    w_unit_sel = st.radio("Wassereinheit", ["ml", "Liter"], key=f"wu_sel_{pos}", label_visibility="collapsed")
+                    
+                    # Automatische Umrechnung Backend (ml) -> UI (ml/L)
+                    current_w_val = get_water_display_values(pot.wat_amount, w_unit_sel)
+                    
+                    new_amount_val = st.number_input(
+                        f"Menge ({w_unit_sel})", 
+                        min_value=0.1, 
+                        value=float(current_w_val), 
+                        step=10.0 if w_unit_sel == "ml" else 0.1, 
+                        key=f"nam_{pos}"
+                    )
                     
                     st.divider()
                     st.markdown("**Bedingung**")
@@ -255,34 +310,35 @@ def page_detail():
                         new_thresh = pot.moist_thresh
 
                     if st.button("Speichern", key=f"sv_{pos}", type="primary"):
-                        # Umrechnung zurück in Minuten für das Backend
-                        minutes_calc = convert_ui_to_minutes(new_time_val, new_time_unit)
+                        # Rückrechnung UI -> Backend
+                        calc_minutes = get_time_backend_minutes(new_time_val, t_unit_sel)
+                        calc_ml = get_water_backend_ml(new_amount_val, w_unit_sel)
                         
                         pot.control_mode = new_mode
                         pot.moist_thresh = new_thresh
-                        pot.wat_amount = new_amount
-                        pot.wat_event_cyc = minutes_calc
+                        
+                        # Hier speichern wir im Hintergrund die Standard-Einheiten (min / ml)
+                        pot.wat_amount = calc_ml
+                        pot.wat_event_cyc = calc_minutes
                         
                         # Scheduler update
                         backend.scheduler.add_job(pot.WaterThePot, 'interval', minutes=pot.wat_event_cyc, id=f"j_M{m_id}P{pos}", replace_existing=True)
-                        log_event(m_id, f"Settings {pot.name}: Alle {new_time_val} {new_time_unit}", "CONFIG")
+                        log_event(m_id, f"Settings {pot.name}: Alle {new_time_val} {t_unit_sel}, {new_amount_val} {w_unit_sel}", "CONFIG")
                         st.toast("Gespeichert!", icon="✅")
                         st.rerun()
 
-            # Aktionen
+            # SPALTE 3: Aktionen
             with cols[2]:
                 st.write("")
                 if st.button("💦 Gießen", key=f"wat_{pos}", use_container_width=True):
                     pot.WaterThePot()
                     st.toast("Gießbefehl gesendet", icon="💦")
                 st.write("")
-                # Kalibrierung
                 with st.popover("Sensor Kalibrieren"):
                     if st.button("Trocken (Min)", key=f"cdry_{pos}"):
                         backend.ReqestCalibration(m_id, "Moist", pos, "min")
                     if st.button("Nass (Max)", key=f"cwet_{pos}"):
                         backend.ReqestCalibration(m_id, "Moist", pos, "max")
-
                 st.write("")
                 if st.button("Preset speichern", key=f"ps_sv_{pos}", use_container_width=True):
                      pot.SavePreset(pot.name)
