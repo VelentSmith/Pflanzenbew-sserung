@@ -185,10 +185,10 @@ def on_disconnect(c, u, rc):      print("MQTT disconnected:", rc)
 def on_message(client, userdata, msg):
     try:
         data = json.loads(msg.payload.decode())    
-        mod_id = int(msg.topic.replac("Greenthumb/Modul", ""))
+        mod_id = int(msg.topic.replace("Greenthumb/Modul", ""))
         module = Modules.get(mod_id)
         MQTT_data_buffer.append(data)
-        module.MQTT_buffer.abbend(data)
+        module.MQTT_buffer.append(data)
         print(f"Antwort empfangen: {data}")
 
     except Exception as e:
@@ -313,6 +313,7 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Fehler in main loop: {e}")
+
 
 
 
