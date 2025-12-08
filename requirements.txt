@@ -1,4 +1,4 @@
 streamlit
-streamlit-echarts
+paho-mqtt
+apscheduler
 pandas
-numpy
