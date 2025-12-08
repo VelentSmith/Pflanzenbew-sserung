@@ -320,12 +320,12 @@ def ProcessSensorData(module, msg):
 
 # --- instantiate objects, TO BE REPLACED BY UI INPUT!!! -----------------------
 # region 
-    AddModule(1, "Fensterbank")
-    AddModule(2, "Regal")
+AddModule(1, "Fensterbank")
+AddModule(2, "Regal")
 
-    Modules[1].AddPot(1, "Orchidee", "time", 250, 60, 15)
-    Modules[1].AddPot(2, "Kaktus", "moist", 100, 20, 0)
-    Modules[2].AddPot(3, "Monstera", "moist", 1400, 10, 15)
+Modules[1].AddPot(1, "Orchidee", "time", 250, 60, 15)
+Modules[1].AddPot(2, "Kaktus", "moist", 100, 20, 0)
+Modules[2].AddPot(3, "Monstera", "moist", 1400, 10, 15)
 # endregion
 
 # --- Main ------------------------------------------------------------
@@ -347,3 +347,4 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Fehler in main loop: {e}")
+
