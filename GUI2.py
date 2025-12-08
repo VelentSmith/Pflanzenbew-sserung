@@ -3,8 +3,6 @@ import pandas as pd
 import time
 import os
 from datetime import datetime
-
-# Import Backend (muss im selben Ordner liegen als backend.py)
 import backend
 
 # --- 1. KONFIGURATION & STYLING ---------------------------------------------
@@ -28,7 +26,6 @@ st.markdown("""
         background-color: #e6fffa;
         border: 1px solid #4CAF50;
     }
-    /* Radio Buttons horizontal kompakter machen */
     div[row-widget="radio"] > div {
         flex-direction: row;
         gap: 20px;
@@ -67,7 +64,7 @@ def get_presets():
 def get_time_display_values(minutes_val, selected_unit):
     """Rechnet Minuten (Backend) in die UI-Einheit um."""
     if selected_unit == "Tage":
-        return float(minutes_val / 1440.0) # 60*24
+        return float(minutes_val / 1440.0) 
     else: # Stunden
         return float(minutes_val / 60.0)
 
@@ -225,7 +222,7 @@ def page_detail():
                 p_pos = c_p2.number_input("Position (1-4)", 1, 4, step=1)
                 if st.form_submit_button("Hinzufügen"):
                     if p_pos not in mod.pots:
-                        # Initiale Werte: Zeit in Min (60), Wasser in ml (500)
+                        # Initiale Werte: 1 Stunde (60 min), 500 ml
                         mod.AddPot(p_pos, p_name, "time", 500, 60, 20)
                         log_event(m_id, f"Pflanze {p_name} hinzugefügt", "SETUP")
                         st.rerun()
@@ -268,19 +265,25 @@ def page_detail():
                     
                     # --- ZEIT EINSTELLUNG ---
                     st.markdown("**Intervall (Gieß-Zyklus)**")
-                    # Unit Selector
                     t_unit_sel = st.radio("Zeiteinheit", ["Stunden", "Tage"], key=f"tu_sel_{pos}", label_visibility="collapsed")
                     
-                    # Automatische Umrechnung Backend (min) -> UI (h/d)
+                    # Backend-Wert (Minuten) holen
                     current_t_val = get_time_display_values(pot.wat_event_cyc, t_unit_sel)
                     
-                    # Kleinste Einheit ist 1 Stunde
-                    min_t_input = 1.0 if t_unit_sel == "Stunden" else (1.0/24.0) 
+                    # Min-Werte festlegen (1 Stunde ist das Minimum)
+                    if t_unit_sel == "Stunden":
+                        min_t_input = 1.0
+                    else:
+                        min_t_input = 1.0 / 24.0 # Entspricht 1 Stunde in Tagen
+                    
+                    # FIX: Verhindere Absturz, falls Backend-Wert < Minimum ist
+                    # Wenn Backend 0.1h sagt, aber Min 1.0h ist, zeige 1.0h an.
+                    safe_time_val = max(min_t_input, float(current_t_val))
                     
                     new_time_val = st.number_input(
                         f"Alle ({t_unit_sel})", 
                         min_value=min_t_input, 
-                        value=float(current_t_val), 
+                        value=safe_time_val, 
                         step=0.5, 
                         key=f"ntv_{pos}"
                     )
@@ -289,7 +292,6 @@ def page_detail():
                     st.markdown("**Wassermenge**")
                     w_unit_sel = st.radio("Wassereinheit", ["ml", "Liter"], key=f"wu_sel_{pos}", label_visibility="collapsed")
                     
-                    # Automatische Umrechnung Backend (ml) -> UI (ml/L)
                     current_w_val = get_water_display_values(pot.wat_amount, w_unit_sel)
                     
                     new_amount_val = st.number_input(
@@ -310,18 +312,14 @@ def page_detail():
                         new_thresh = pot.moist_thresh
 
                     if st.button("Speichern", key=f"sv_{pos}", type="primary"):
-                        # Rückrechnung UI -> Backend
                         calc_minutes = get_time_backend_minutes(new_time_val, t_unit_sel)
                         calc_ml = get_water_backend_ml(new_amount_val, w_unit_sel)
                         
                         pot.control_mode = new_mode
                         pot.moist_thresh = new_thresh
-                        
-                        # Hier speichern wir im Hintergrund die Standard-Einheiten (min / ml)
                         pot.wat_amount = calc_ml
                         pot.wat_event_cyc = calc_minutes
                         
-                        # Scheduler update
                         backend.scheduler.add_job(pot.WaterThePot, 'interval', minutes=pot.wat_event_cyc, id=f"j_M{m_id}P{pos}", replace_existing=True)
                         log_event(m_id, f"Settings {pot.name}: Alle {new_time_val} {t_unit_sel}, {new_amount_val} {w_unit_sel}", "CONFIG")
                         st.toast("Gespeichert!", icon="✅")
