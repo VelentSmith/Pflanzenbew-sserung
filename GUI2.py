@@ -229,4 +229,73 @@ def page_detail():
                     sel_preset = c_pr1.selectbox("Preset", [""] + get_presets(), key=f"ps_sel_{pos}", label_visibility="collapsed")
                     if c_pr2.button("Laden", key=f"ps_ld_{pos}") and sel_preset:
                         if pot.LoadPreset(sel_preset):
-                            backend.scheduler.add_job(pot.WaterThePot, 'interval', minutes=pot.wat_event_cyc, id=f"j_M{m_
+                            backend.scheduler.add_job(pot.WaterThePot, 'interval', minutes=pot.wat_event_cyc, id=f"j_M{m_id}P{pos}", replace_existing=True)
+                            st.toast("Preset geladen!", icon="💾")
+                            st.rerun()
+                    
+                    st.divider()
+                    
+                    # Intervall Rechner (NEU)
+                    st.markdown("**Bewässerungs-Plan**")
+                    current_val, current_unit = convert_minutes_to_ui(pot.wat_event_cyc)
+                    
+                    c_time_val, c_time_unit = st.columns(2)
+                    new_time_val = c_time_val.number_input("Alle...", min_value=1, value=current_val, key=f"ntv_{pos}")
+                    new_time_unit = c_time_unit.selectbox("Einheit", ["Minuten", "Stunden", "Tage"], index=["Minuten", "Stunden", "Tage"].index(current_unit), key=f"ntu_{pos}")
+                    
+                    new_amount = st.number_input("Menge (Liter)", 0.1, 5.0, pot.wat_amount, step=0.1, key=f"am_{pos}")
+                    
+                    st.divider()
+                    st.markdown("**Bedingung**")
+                    new_mode = st.radio("Modus", ["time", "moist"], index=0 if pot.control_mode=="time" else 1, key=f"md_{pos}", horizontal=True, format_func=lambda x: "Immer (Zeit)" if x=="time" else "Nur wenn trocken (Sensor)")
+                    
+                    if new_mode == "moist":
+                        new_thresh = st.slider("Schwellwert (%)", 0, 100, pot.moist_thresh, key=f"th_{pos}")
+                    else:
+                        new_thresh = pot.moist_thresh
+
+                    if st.button("Speichern", key=f"sv_{pos}", type="primary"):
+                        # Umrechnung zurück in Minuten für das Backend
+                        minutes_calc = convert_ui_to_minutes(new_time_val, new_time_unit)
+                        
+                        pot.control_mode = new_mode
+                        pot.moist_thresh = new_thresh
+                        pot.wat_amount = new_amount
+                        pot.wat_event_cyc = minutes_calc
+                        
+                        # Scheduler update
+                        backend.scheduler.add_job(pot.WaterThePot, 'interval', minutes=pot.wat_event_cyc, id=f"j_M{m_id}P{pos}", replace_existing=True)
+                        log_event(m_id, f"Settings {pot.name}: Alle {new_time_val} {new_time_unit}", "CONFIG")
+                        st.toast("Gespeichert!", icon="✅")
+                        st.rerun()
+
+            # Aktionen
+            with cols[2]:
+                st.write("")
+                if st.button("💦 Gießen", key=f"wat_{pos}", use_container_width=True):
+                    pot.WaterThePot()
+                    st.toast("Gießbefehl gesendet", icon="💦")
+                st.write("")
+                # Kalibrierung
+                with st.popover("Sensor Kalibrieren"):
+                    if st.button("Trocken (Min)", key=f"cdry_{pos}"):
+                        backend.ReqestCalibration(m_id, "Moist", pos, "min")
+                    if st.button("Nass (Max)", key=f"cwet_{pos}"):
+                        backend.ReqestCalibration(m_id, "Moist", pos, "max")
+
+                st.write("")
+                if st.button("Preset speichern", key=f"ps_sv_{pos}", use_container_width=True):
+                     pot.SavePreset(pot.name)
+                     st.toast(f"Gespeichert: {pot.name}", icon="💾")
+
+# --- 5. MAIN ----------------------------------------------------------------
+
+if 'page' not in st.session_state:
+    st.session_state.page = 'overview'
+    init_logs()
+
+process_backend_data()
+render_sidebar()
+
+if st.session_state.page == 'overview': page_overview()
+elif st.session_state.page == 'detail': page_detail()
