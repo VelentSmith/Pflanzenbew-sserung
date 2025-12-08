@@ -317,7 +317,6 @@ def ProcessSensorData(module, msg):
     except Exception as e:
         print(f"Fehler in SensorData: {e}")
 
-
 # --- instantiate objects, TO BE REPLACED BY UI INPUT!!! -----------------------
 # region 
 AddModule(1, "Fensterbank")
@@ -347,4 +346,5 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Fehler in main loop: {e}")
+
 
