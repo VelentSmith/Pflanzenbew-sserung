@@ -355,8 +355,8 @@ def page_detail():
                         new_thresh = pot.moist_thresh
 
                     if st.button("Speichern", key=f"sv_{pos}", type="primary"):
-                        calc_minutes = float(round(get_time_backend_minutes(new_time_val, t_unit_sel),2))
-                        calc_ml = float(round(get_water_backend_ml(new_amount_val, w_unit_sel),2))
+                        calc_minutes = round(get_time_backend_minutes(new_time_val, t_unit_sel),2)
+                        calc_ml = round(get_water_backend_ml(new_amount_val, w_unit_sel),2)
                         
                         pot.control_mode = new_mode
                         pot.moist_thresh = new_thresh
