@@ -327,7 +327,7 @@ def page_detail():
                         f"Alle ({t_unit_sel})", 
                         min_value=min_t_input, 
                         value=safe_time_val, 
-                        step=0.5, 
+                        step=0.5 if t_unit_sel == "Tage" else 2.0, 
                         key=f"ntv_{pos}"
                     )
 
