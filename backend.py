@@ -14,7 +14,7 @@ class Module:
         self.module_id = module_id
         self.name = name
         self.wat_event_time = time(9,0)
-        self.tankLvl = None
+        self.tankLvl = 69
         self.tankLvlThresh = 10
         self.tankLvlMax = 100
         self.tankLvlMin = 0
@@ -476,6 +476,7 @@ if __name__ == "__main__":
         print(f"Fehler in main loop: {e}")
         stop_processing_worker()
         client.disconnect()
+
 
 
 
