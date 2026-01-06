@@ -7,6 +7,12 @@ from datetime import datetime
 # Import Backend (muss im selben Ordner liegen als backend.py)
 import backend
 
+# Backend-Worker (MQTT buffer processing) genau einmal starten
+if "backend_worker_started" not in st.session_state:
+    backend.start_processing_worker()
+    st.session_state.backend_worker_started = True
+
+
 # --- 1. KONFIGURATION & STYLING ---------------------------------------------
 
 st.set_page_config(
@@ -392,7 +398,7 @@ if 'page' not in st.session_state:
     st.session_state.page = 'overview'
     init_logs()
 
-process_backend_data()
+#process_backend_data()         # nicht mehr nötig: läuft im backend-worker thread
 render_sidebar()
 
 if st.session_state.page == 'overview': page_overview()
