@@ -195,7 +195,7 @@ def page_overview():
                 
                 # Metrics (Die "zwei Balken" mit Beschriftung)
                 c_a, c_b = st.columns(2)
-                level = getattr(mod, 'TankLvl', 0)
+                level = getattr(mod, 'tankLvl', 0)
                 
                 # Klare Labels hier:
                 c_a.metric("💧 Wassertank", f"{level:.0f}%" if level is not None else "?")
@@ -249,17 +249,17 @@ def page_detail():
     # --- OBERER BEREICH ---
     col_tank, col_calib, col_log = st.columns([1.5, 1, 2.5])
     with col_tank:
-        draw_water_tank_graphic(getattr(mod, 'TankLvl', None), getattr(mod, 'TankLvlMin', '?'), getattr(mod, 'TankLvlMax', '?'))
+        draw_water_tank_graphic(getattr(mod, 'tankLvl', None), getattr(mod, 'tankLvlMin', '?'), getattr(mod, 'tankLvlMax', '?'))
         
     with col_calib:
         st.markdown("#### Kalibrierung")
         st.caption("Füllstandssensor:")
         if st.button("Setze MIN (Leer)", key="cal_min", use_container_width=True):
-            backend.ReqestCalibration(m_id, "Plvl", 0, "min")
+            backend.ReqestCalibration(m_id, "P", 0, "min")
             st.toast("Kalibrierung MIN gesendet", icon="📡")
         st.write("")
         if st.button("Setze MAX (Voll)", key="cal_max", use_container_width=True):
-            backend.ReqestCalibration(m_id, "Plvl", 0, "max")
+            backend.ReqestCalibration(m_id, "P", 0, "max")
             st.toast("Kalibrierung MAX gesendet", icon="📡")
 
     with col_log:
@@ -389,9 +389,9 @@ def page_detail():
                 st.write("")
                 with st.popover("Sensor Kalibrieren"):
                     if st.button("Trocken (Min)", key=f"cdry_{pos}"):
-                        backend.ReqestCalibration(m_id, "Moist", pos, "min")
+                        backend.ReqestCalibration(m_id, "M", pos, "min")
                     if st.button("Nass (Max)", key=f"cwet_{pos}"):
-                        backend.ReqestCalibration(m_id, "Moist", pos, "max")
+                        backend.ReqestCalibration(m_id, "M", pos, "max")
                 
                 st.write("")
                 if st.button("Preset speichern", key=f"ps_sv_{pos}", use_container_width=True):
