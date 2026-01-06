@@ -203,21 +203,33 @@ def page_overview():
                 
                 st.write("") # Abstand
                 
-                # Buttons: Verwalten & Löschen
-                c_btn1, c_btn2 = st.columns([2, 1])
+                # Buttons: Verwalten, Status & Löschen
+                c_btn1, c_btn2, c_btn3 = st.columns([2, 2, 1])
                 
                 with c_btn1:
                     if st.button(f"Verwalten >", key=f"btn_mod_{m_id}", use_container_width=True):
                         st.session_state.selected_module = m_id
                         st.session_state.page = 'detail'
                         st.rerun()
-                
+
                 with c_btn2:
-                    # Löschen Button mit Popover zur Sicherheit (optional, hier direkt)
+                    # Status Button basierend auf forcePaused
+                    is_paused = getattr(mod, 'forcePaused', False)
+                    btn_label = "🔴 Deaktiviert" if is_paused else "🟢 Aktiv"
+                    
+                    if st.button(btn_label, key=f"pause_mod_{m_id}", use_container_width=True):
+                        # Toggle der Variable (Logik muss im Modul-Objekt vorhanden sein)
+                        mod.forcePaused = not is_paused
+                        status_msg = "deaktiviert" if mod.forcePaused else "aktiviert"
+                        log_event(m_id, f"Modul manuell {status_msg}", "STATUS")
+                        st.rerun()
+                
+                with c_btn3:
                     if st.button("🗑️", key=f"del_mod_{m_id}", help="Modul löschen", type="primary", use_container_width=True):
                         delete_module_safe(m_id)
                         st.toast(f"Modul {m_id} gelöscht!", icon="🗑️")
                         st.rerun()
+                
 
 def page_detail():
     if 'selected_module' not in st.session_state or st.session_state.selected_module not in backend.Modules:
@@ -355,8 +367,8 @@ def page_detail():
                         new_thresh = pot.moist_thresh
 
                     if st.button("Speichern", key=f"sv_{pos}", type="primary"):
-                        calc_minutes = round(get_time_backend_minutes(new_time_val, t_unit_sel),2)
-                        calc_ml = round(get_water_backend_ml(new_amount_val, w_unit_sel),2)
+                        calc_minutes = float(round(get_time_backend_minutes(new_time_val, t_unit_sel),2))
+                        calc_ml = float(round(get_water_backend_ml(new_amount_val, w_unit_sel),2))
                         
                         pot.control_mode = new_mode
                         pot.moist_thresh = new_thresh
@@ -380,10 +392,20 @@ def page_detail():
                         backend.ReqestCalibration(m_id, "Moist", pos, "min")
                     if st.button("Nass (Max)", key=f"cwet_{pos}"):
                         backend.ReqestCalibration(m_id, "Moist", pos, "max")
+                
                 st.write("")
                 if st.button("Preset speichern", key=f"ps_sv_{pos}", use_container_width=True):
                      pot.SavePreset(pot.name)
                      st.toast(f"Gespeichert: {pot.name}", icon="💾")
+
+                st.write("")
+                is_p_paused = getattr(pot, 'forcePaused', False)
+                p_btn_label = "🔴 Deaktiviert" if is_p_paused else "🟢 Aktiv"
+                if st.button(p_btn_label, key=f"p_pause_{m_id}_{pos}", use_container_width=True):
+                    pot.forcePaused = not is_p_paused
+                    log_event(m_id, f"Pflanze {pot.name} {'pausiert' if pot.forcePaused else 'reaktiviert'}", "STATUS")
+                    st.rerun()
+                
                 st.write("")
                 st.divider()
                 # Button zum Löschen der Pflanze
