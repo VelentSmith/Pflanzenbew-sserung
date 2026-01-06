@@ -1,4 +1,3 @@
-from ast import Not
 import json
 import os
 import time as systime
@@ -6,9 +5,6 @@ import paho.mqtt.client as mqtt
 from datetime import datetime, time, timedelta
 import threading
 from apscheduler.schedulers.background import BackgroundScheduler
-
-import re
-
 
 # --- Klassen Komposition -------------------------------------------------
 OFFLINE_TIMEOUT_MIN = 20
@@ -480,6 +476,7 @@ if __name__ == "__main__":
         print(f"Fehler in main loop: {e}")
         stop_processing_worker()
         client.disconnect()
+
 
 
 
