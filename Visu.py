@@ -323,13 +323,13 @@ def page_detail():
                     
                     safe_time_val = max(min_t_input, float(current_t_val))
                     
-                    new_time_val = round(st.number_input(
+                    new_time_val = float(round(st.number_input(
                         f"Alle ({t_unit_sel})", 
                         min_value=min_t_input, 
                         value=safe_time_val, 
                         step=0.5 if t_unit_sel == "Tage" else 2.0, 
                         key=f"ntv_{pos}"
-                    ),2)
+                    ),2))
 
                     # --- WASSERMENGE EINSTELLUNG ---
                     st.markdown("**Wassermenge**")
@@ -337,13 +337,13 @@ def page_detail():
                     
                     current_w_val = get_water_display_values(pot.wat_amount, w_unit_sel)
                     
-                    new_amount_val = round(st.number_input(
+                    new_amount_val = float(round(st.number_input(
                         f"Menge ({w_unit_sel})", 
                         min_value=10 if w_unit_sel == "ml" else 0.01, 
                         value=float(current_w_val), 
                         step=10.0 if w_unit_sel == "ml" else 0.1, 
                         key=f"nam_{pos}"
-                    ),2)
+                    ),2))
                     
                     st.divider()
                     st.markdown("**Bedingung**")
@@ -355,8 +355,8 @@ def page_detail():
                         new_thresh = pot.moist_thresh
 
                     if st.button("Speichern", key=f"sv_{pos}", type="primary"):
-                        calc_minutes = round(get_time_backend_minutes(new_time_val, t_unit_sel),2)
-                        calc_ml = round(get_water_backend_ml(new_amount_val, w_unit_sel),2)
+                        calc_minutes = float(round(get_time_backend_minutes(new_time_val, t_unit_sel),2))
+                        calc_ml = float(round(get_water_backend_ml(new_amount_val, w_unit_sel),2))
                         
                         pot.control_mode = new_mode
                         pot.moist_thresh = new_thresh
