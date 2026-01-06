@@ -329,7 +329,7 @@ def page_detail():
                         value=safe_time_val, 
                         step=0.5 if t_unit_sel == "Tage" else 2.0, 
                         key=f"ntv_{pos}"
-                    ),1)
+                    ),2)
 
                     # --- WASSERMENGE EINSTELLUNG ---
                     st.markdown("**Wassermenge**")
@@ -339,11 +339,11 @@ def page_detail():
                     
                     new_amount_val = round(st.number_input(
                         f"Menge ({w_unit_sel})", 
-                        min_value=0.1, 
+                        min_value=10 if w_unit_sel == "ml" else 0.01, 
                         value=float(current_w_val), 
                         step=10.0 if w_unit_sel == "ml" else 0.1, 
                         key=f"nam_{pos}"
-                    ),1)
+                    ),2)
                     
                     st.divider()
                     st.markdown("**Bedingung**")
@@ -355,8 +355,8 @@ def page_detail():
                         new_thresh = pot.moist_thresh
 
                     if st.button("Speichern", key=f"sv_{pos}", type="primary"):
-                        calc_minutes = round(get_time_backend_minutes(new_time_val, t_unit_sel),1)
-                        calc_ml = round(get_water_backend_ml(new_amount_val, w_unit_sel),1)
+                        calc_minutes = round(get_time_backend_minutes(new_time_val, t_unit_sel),2)
+                        calc_ml = round(get_water_backend_ml(new_amount_val, w_unit_sel),2)
                         
                         pot.control_mode = new_mode
                         pot.moist_thresh = new_thresh
