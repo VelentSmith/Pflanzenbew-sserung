@@ -207,7 +207,7 @@ def page_overview():
                 c_btn1, c_btn2, c_btn3 = st.columns([2, 2, 1])
                 
                 with c_btn1:
-                    if st.button(f"Verwalten >", key=f"btn_mod_{m_id}", use_container_width=True):
+                    if st.button(f"Verwalten >", key=f"btn_mod_{m_id}", width="stretch"):
                         st.session_state.selected_module = m_id
                         st.session_state.page = 'detail'
                         st.rerun()
@@ -217,7 +217,7 @@ def page_overview():
                     is_paused = getattr(mod, 'forcePaused', False)
                     btn_label = "🔴 Deaktiviert" if is_paused else "🟢 Aktiv"
                     
-                    if st.button(btn_label, key=f"pause_mod_{m_id}", use_container_width=True):
+                    if st.button(btn_label, key=f"pause_mod_{m_id}", width="stretch"):
                         # Toggle der Variable (Logik muss im Modul-Objekt vorhanden sein)
                         mod.forcePaused = not is_paused
                         status_msg = "deaktiviert" if mod.forcePaused else "aktiviert"
@@ -225,7 +225,7 @@ def page_overview():
                         st.rerun()
                 
                 with c_btn3:
-                    if st.button("🗑️", key=f"del_mod_{m_id}", help="Modul löschen", type="primary", use_container_width=True):
+                    if st.button("🗑️", key=f"del_mod_{m_id}", help="Modul löschen", type="primary", width="stretch"):
                         delete_module_safe(m_id)
                         st.toast(f"Modul {m_id} gelöscht!", icon="🗑️")
                         st.rerun()
@@ -254,11 +254,11 @@ def page_detail():
     with col_calib:
         st.markdown("#### Kalibrierung")
         st.caption("Füllstandssensor:")
-        if st.button("Setze MIN (Leer)", key="cal_min", use_container_width=True):
+        if st.button("Setze MIN (Leer)", key="cal_min", width="stretch"):
             backend.ReqestCalibration(m_id, "P", 0, "min")
             st.toast("Kalibrierung MIN gesendet", icon="📡")
         st.write("")
-        if st.button("Setze MAX (Voll)", key="cal_max", use_container_width=True):
+        if st.button("Setze MAX (Voll)", key="cal_max", width="stretch"):
             backend.ReqestCalibration(m_id, "P", 0, "max")
             st.toast("Kalibrierung MAX gesendet", icon="📡")
 
@@ -266,7 +266,7 @@ def page_detail():
         st.markdown("#### 📝 Logbuch")
         if hasattr(mod, 'app_log') and mod.app_log:
             df = pd.DataFrame(mod.app_log)
-            st.dataframe(df, height=200, hide_index=True, use_container_width=True)
+            st.dataframe(df, height=200, hide_index=True, width="stretch")
         else: st.info("Keine Einträge.")
 
     st.divider()
@@ -383,7 +383,7 @@ def page_detail():
             # SPALTE 3: Aktionen
             with cols[2]:
                 st.write("")
-                if st.button("💦 Gießen", key=f"wat_{pos}", use_container_width=True):
+                if st.button("💦 Gießen", key=f"wat_{pos}", width="stretch"):
                     pot.WaterThePot()
                     st.toast("Gießbefehl gesendet", icon="💦")
                 st.write("")
@@ -394,14 +394,14 @@ def page_detail():
                         backend.ReqestCalibration(m_id, "M", pos, "max")
                 
                 st.write("")
-                if st.button("Preset speichern", key=f"ps_sv_{pos}", use_container_width=True):
+                if st.button("Preset speichern", key=f"ps_sv_{pos}", width="stretch"):
                      pot.SavePreset(pot.name)
                      st.toast(f"Gespeichert: {pot.name}", icon="💾")
 
                 st.write("")
                 is_p_paused = getattr(pot, 'forcePaused', False)
                 p_btn_label = "🔴 Deaktiviert" if is_p_paused else "🟢 Aktiv"
-                if st.button(p_btn_label, key=f"p_pause_{m_id}_{pos}", use_container_width=True):
+                if st.button(p_btn_label, key=f"p_pause_{m_id}_{pos}", width="stretch"):
                     pot.forcePaused = not is_p_paused
                     log_event(m_id, f"Pflanze {pot.name} {'pausiert' if pot.forcePaused else 'reaktiviert'}", "STATUS")
                     st.rerun()
